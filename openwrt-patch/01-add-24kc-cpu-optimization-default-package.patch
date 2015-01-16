@@ -32,7 +32,7 @@
    ifeq ($(ARCH),powerpc)
      CPU_CFLAGS_603e:=-mcpu=603e
 -    CPU_CFLAGS_8540:=-mcpu=8540
-+    CPU_CFLAGS_8540:=-mcpu=e500mc
++    CPU_CFLAGS_8540:=-mcpu=e500mc -fomit-frame-pointer
      CPU_CFLAGS_405:=-mcpu=405
      CPU_CFLAGS_440:=-mcpu=440
    endif
