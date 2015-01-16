@@ -1,4 +1,4 @@
-Custom OpenWrt Patch For Barrier-Breaker TL-WDR3600/4300/4310
+Custom OpenWrt Patch For Barrier-Breaker TL-WDR4900v1
 =============================================================
 
 Dependencies
@@ -19,7 +19,7 @@ git clone git://git.openwrt.org/14.07/openwrt.git
 ```
 * Clone this Repository and copy into the OpenWRT repository
 ```
-git clone https://github.com/gwlim/mips74k-barrier-breaker-patch.git temp; mv temp/* openwrt/; rm -rf temp
+git clone https://github.com/gwlim/mpc85xx-barrier-breaker-patch.git temp; mv temp/* openwrt/; rm -rf temp
 ```
 
 * Change directory into the OpenWrt Repository
@@ -31,7 +31,7 @@ cd openwrt
 ```
 ./bb_openwrt.sh
 ```
-* Make Menuconfig and select the Target Profile TP-LINK TL-WDR3500/3600/4300/4310/MW4350R (all the packages and config is inside except build target
+* Make Menuconfig and select the Target Profile TP-LINK TL-WDR4900v1 (all the packages and config is inside except build target
 ```
 make menuconfig
 ```
