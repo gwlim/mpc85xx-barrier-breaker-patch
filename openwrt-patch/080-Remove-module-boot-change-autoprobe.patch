@@ -109,6 +109,15 @@
  endef
  
  define KernelPackage/eeprom-93cx6/description
+@@ -461,7 +461,7 @@ define KernelPackage/booke-wdt
+   DEPENDS:=@(TARGET_mpc85xx||TARGET_ppc40x||TARGET_ppc44x)
+   KCONFIG:=CONFIG_BOOKE_WDT
+   FILES:=$(LINUX_DIR)/drivers/$(WATCHDOG_DIR)/booke_wdt.ko
+-  AUTOLOAD:=$(call AutoLoad,50,booke_wdt)
++  AUTOLOAD:=$(call AutoProbe,booke_wdt)
+ endef
+ 
+ define KernelPackage/booke-wdt/description
 @@ -732,7 +732,7 @@ else
  	$(LINUX_DIR)/drivers/staging/zsmalloc/zsmalloc.ko \
  	$(LINUX_DIR)/drivers/staging/zram/zram.ko
@@ -223,6 +232,15 @@
 
 --- ./package/kernel/linux/modules/netdevices.mk	2014-11-22 23:40:52.000000000 +0800
 +++ ./package/kernel/linux/modules/netdevices.mk	2014-11-23 01:06:49.646157741 +0800
+@@ -100,7 +100,7 @@ define KernelPackage/mii
+   TITLE:=MII library
+   KCONFIG:=CONFIG_MII
+   FILES:=$(LINUX_DIR)/drivers/net/mii.ko
+-  AUTOLOAD:=$(call AutoLoad,15,mii,1)
++  AUTOLOAD:=$(call AutoProbe,mii,1)
+ endef
+ 
+ define KernelPackage/mii/description
 @@ -685,7 +685,7 @@ define KernelPackage/ifb
  	CONFIG_IFB \
  	CONFIG_NET_CLS=y
@@ -385,3 +403,15 @@
  endef
  
  $(eval $(call KernelPackage,scsi-core))
+
+--- ./package/kernel/button-hotplug/Makefile	2015-01-16 19:17:24.000000000 +0800
++++ ./package/kernel/button-hotplug/Makefile	2015-01-16 21:17:01.751241450 +0800
+@@ -18,7 +18,7 @@ define KernelPackage/button-hotplug
+   TITLE:=Button Hotplug driver
+   DEPENDS:=+kmod-input-core
+   FILES:=$(PKG_BUILD_DIR)/button-hotplug.ko
+-  AUTOLOAD:=$(call AutoLoad,30,button-hotplug,1)
++  AUTOLOAD:=$(call AutoProbe,button-hotplug,1)
+   KCONFIG:=
+ endef
+ 
