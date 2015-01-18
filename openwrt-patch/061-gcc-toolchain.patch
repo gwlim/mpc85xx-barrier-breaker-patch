@@ -7,7 +7,7 @@
 -	--enable-threads \
 +	--enable-threads=posix \
 +	--disable-nls \
-+	--with-cpu=e500mc \
++	--with-cpu=8548 \
  	--with-slibdir=$(TOOLCHAIN_DIR)/lib
  
  ifneq ($(CONFIG_GCC_VERSION_4_5)$(CONFIG_GCC_VERSION_4_6),)
