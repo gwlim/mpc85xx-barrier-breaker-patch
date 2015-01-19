@@ -1,0 +1,11 @@
+--- ./scripts/metadata.pl	2015-01-18 18:47:34.000000000 +0800
++++ ./scripts/metadata.pl	2015-01-19 21:17:27.759090046 +0800
+@@ -282,7 +282,7 @@ sub gen_target_config() {
+ 	print <<EOF;
+ choice
+ 	prompt "Target System"
+-	default TARGET_ar71xx
++	default TARGET_mpc85xx
+ 	reset if !DEVEL
+ 	
+ EOF
