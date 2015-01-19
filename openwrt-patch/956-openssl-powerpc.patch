@@ -1,0 +1,30 @@
+--- ./package/libs/openssl/Makefile	2015-01-19 23:17:03.000000000 +0800
++++ ./package/libs/openssl/Makefile	2015-01-19 23:17:41.535521063 +0800
+@@ -113,8 +113,12 @@ else
+   ifeq ($(CONFIG_mips)$(CONFIG_mipsel),y)
+     OPENSSL_TARGET:=linux-mips-openwrt
+   else
+-    OPENSSL_TARGET:=linux-generic-openwrt
+-    OPENSSL_OPTIONS+=no-perlasm
++    ifeq ($(CONFIG_powerpc),y)
++      OPENSSL_TARGET:=linux-ppc-openwrt
++    else
++      OPENSSL_TARGET:=linux-generic-openwrt
++      OPENSSL_OPTIONS+=no-perlasm
++    endif
+   endif
+ endif
+
+--- /dev/null	2015-01-19 20:50:17.318402839 +0800
++++ ./package/libs/openssl/patches/212-optimize-for-size-ppc.patch	2015-01-19 23:11:21.711522688 +0800
+@@ -0,0 +1,10 @@
++--- a/Configure	2015-01-18 20:46:02.000000000 +0800
+++++ b/Configure	2015-01-19 23:08:43.483291933 +0800
++@@ -405,6 +405,7 @@ my %table=(
++ 
++ # OpenWrt targets
++ "linux-mips-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${mips32_asm}:o32:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
+++"linux-ppc-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${ppc32_asm}:linux32:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
++ "linux-generic-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${no_asm}:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
++ 
++ # Android: linux-* but without -DTERMIO and pointers to headers and libs.
