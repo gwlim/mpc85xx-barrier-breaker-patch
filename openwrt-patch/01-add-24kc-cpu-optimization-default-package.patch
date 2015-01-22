@@ -9,7 +9,7 @@
 +luci-ssl luci-app-firewall luci-app-p2pblock luci-app-p910nd luci-app-qos luci-app-mwan3 wget hostapd-utils \
 +luci-app-tinyproxy luci-app-upnp luci-app-wol luci-i18n-english luci-app-ddns xl2tpd uqmi kmod-tun ds-lite \
 +luci-proto-3g luci-proto-ipv6 luci-proto-ppp luci-proto-relay libopenssl ppp-mod-pppol2tp ppp-mod-pptp \
-+usb-modeswitch vsftpd-tls igmpproxy 6in4 6rd 6to4 ppp-mod-pptp restorefactory kmod-usb-printer kmod-usb-storage kmod-fs-ext4 \
++usb-modeswitch vsftpd-tls igmpproxy 6in4 6rd 6to4 ppp-mod-pptp restorefactory kmod-usb-printer kmod-usb-storage kmod-fs-ext4 block-mount \
 +kmod-usb-serial kmod-usb-serial-option kmod-usb-net-cdc-ncm kmod-usb-net-rndis kmod-usb-net-qmi-wwan kmod-usb-net-cdc-ether kmod-usb-net-sierrawireless kmod-usb-acm kmod-usb-serial-sierrawireless kmod-usb-serial-qualcomm kmod-usb-net
  DEFAULT_PACKAGES.bootloader:=
  
@@ -32,7 +32,7 @@
    ifeq ($(ARCH),powerpc)
      CPU_CFLAGS_603e:=-mcpu=603e
 -    CPU_CFLAGS_8540:=-mcpu=8540
-+    CPU_CFLAGS_8540:=-mcpu=8548 -mspe -misel -mabi=spe -mfloat-gprs=double
++    CPU_CFLAGS_8540:=-mcpu=8548 -mspe -misel -mabi=spe -fomit-frame-pointer -mfloat-gprs=double
      CPU_CFLAGS_405:=-mcpu=405
      CPU_CFLAGS_440:=-mcpu=440
    endif
