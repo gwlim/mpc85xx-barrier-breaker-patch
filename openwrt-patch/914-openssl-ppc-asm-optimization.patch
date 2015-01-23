@@ -1,0 +1,1348 @@
+--- /dev/null	2015-01-22 21:23:21.294178029 +0800
++++ ./package/libs/openssl/patches/213-openssl-ppc-asm.patch	2015-01-23 00:50:06.962933787 +0800
+@@ -0,0 +1,1345 @@
++--- a/crypto/aes/asm/aes-ppc.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/aes/asm/aes-ppc.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -45,6 +45,8 @@ if ($flavour =~ /64/) {
++ 	$PUSH	="stw";
++ } else { die "nonsense $flavour"; }
++ 
+++$LITTLE_ENDIAN = ($flavour=~/le$/) ? $SIZE_T : 0;
+++
++ $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++ ( $xlate="${dir}ppc-xlate.pl" and -f $xlate ) or
++ ( $xlate="${dir}../../perlasm/ppc-xlate.pl" and -f $xlate) or
++@@ -68,7 +70,7 @@ $key="r5";
++ $Tbl0="r3";
++ $Tbl1="r6";
++ $Tbl2="r7";
++-$Tbl3="r2";
+++$Tbl3=$out;	# stay away from "r2"; $out is offloaded to stack
++ 
++ $s0="r8";
++ $s1="r9";
++@@ -76,7 +78,7 @@ $s2="r10";
++ $s3="r11";
++ 
++ $t0="r12";
++-$t1="r13";
+++$t1="r0";	# stay away from "r13";
++ $t2="r14";
++ $t3="r15";
++ 
++@@ -100,9 +102,6 @@ $acc13="r29";
++ $acc14="r30";
++ $acc15="r31";
++ 
++-# stay away from TLS pointer
++-if ($SIZE_T==8)	{ die if ($t1 ne "r13");  $t1="r0";		}
++-else		{ die if ($Tbl3 ne "r2"); $Tbl3=$t0; $t0="r0";	}
++ $mask80=$Tbl2;
++ $mask1b=$Tbl3;
++ 
++@@ -337,8 +336,7 @@ $code.=<<___;
++ 	$STU	$sp,-$FRAME($sp)
++ 	mflr	r0
++ 
++-	$PUSH	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$PUSH	r13,`$FRAME-$SIZE_T*19`($sp)
+++	$PUSH	$out,`$FRAME-$SIZE_T*19`($sp)
++ 	$PUSH	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$PUSH	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$PUSH	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -365,16 +363,61 @@ $code.=<<___;
++ 	bne	Lenc_unaligned
++ 
++ Lenc_unaligned_ok:
+++___
+++$code.=<<___ if (!$LITTLE_ENDIAN);
++ 	lwz	$s0,0($inp)
++ 	lwz	$s1,4($inp)
++ 	lwz	$s2,8($inp)
++ 	lwz	$s3,12($inp)
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	lwz	$t0,0($inp)
+++	lwz	$t1,4($inp)
+++	lwz	$t2,8($inp)
+++	lwz	$t3,12($inp)
+++	rotlwi	$s0,$t0,8
+++	rotlwi	$s1,$t1,8
+++	rotlwi	$s2,$t2,8
+++	rotlwi	$s3,$t3,8
+++	rlwimi	$s0,$t0,24,0,7
+++	rlwimi	$s1,$t1,24,0,7
+++	rlwimi	$s2,$t2,24,0,7
+++	rlwimi	$s3,$t3,24,0,7
+++	rlwimi	$s0,$t0,24,16,23
+++	rlwimi	$s1,$t1,24,16,23
+++	rlwimi	$s2,$t2,24,16,23
+++	rlwimi	$s3,$t3,24,16,23
+++___
+++$code.=<<___;
++ 	bl	LAES_Te
++ 	bl	Lppc_AES_encrypt_compact
+++	$POP	$out,`$FRAME-$SIZE_T*19`($sp)
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	rotlwi	$t0,$s0,8
+++	rotlwi	$t1,$s1,8
+++	rotlwi	$t2,$s2,8
+++	rotlwi	$t3,$s3,8
+++	rlwimi	$t0,$s0,24,0,7
+++	rlwimi	$t1,$s1,24,0,7
+++	rlwimi	$t2,$s2,24,0,7
+++	rlwimi	$t3,$s3,24,0,7
+++	rlwimi	$t0,$s0,24,16,23
+++	rlwimi	$t1,$s1,24,16,23
+++	rlwimi	$t2,$s2,24,16,23
+++	rlwimi	$t3,$s3,24,16,23
+++	stw	$t0,0($out)
+++	stw	$t1,4($out)
+++	stw	$t2,8($out)
+++	stw	$t3,12($out)
+++___
+++$code.=<<___ if (!$LITTLE_ENDIAN);
++ 	stw	$s0,0($out)
++ 	stw	$s1,4($out)
++ 	stw	$s2,8($out)
++ 	stw	$s3,12($out)
+++___
+++$code.=<<___;
++ 	b	Lenc_done
++ 
++ Lenc_unaligned:
++@@ -417,6 +460,7 @@ Lenc_xpage:
++ 
++ 	bl	LAES_Te
++ 	bl	Lppc_AES_encrypt_compact
+++	$POP	$out,`$FRAME-$SIZE_T*19`($sp)
++ 
++ 	extrwi	$acc00,$s0,8,0
++ 	extrwi	$acc01,$s0,8,8
++@@ -449,8 +493,6 @@ Lenc_xpage:
++ 
++ Lenc_done:
++ 	$POP	r0,`$FRAME+$LRSAVE`($sp)
++-	$POP	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$POP	r13,`$FRAME-$SIZE_T*19`($sp)
++ 	$POP	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$POP	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$POP	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -764,6 +806,7 @@ Lenc_compact_done:
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.AES_encrypt,.-.AES_encrypt
++ 
++ .globl	.AES_decrypt
++ .align	7
++@@ -771,8 +814,7 @@ Lenc_compact_done:
++ 	$STU	$sp,-$FRAME($sp)
++ 	mflr	r0
++ 
++-	$PUSH	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$PUSH	r13,`$FRAME-$SIZE_T*19`($sp)
+++	$PUSH	$out,`$FRAME-$SIZE_T*19`($sp)
++ 	$PUSH	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$PUSH	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$PUSH	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -799,16 +841,61 @@ Lenc_compact_done:
++ 	bne	Ldec_unaligned
++ 
++ Ldec_unaligned_ok:
+++___
+++$code.=<<___ if (!$LITTLE_ENDIAN);
++ 	lwz	$s0,0($inp)
++ 	lwz	$s1,4($inp)
++ 	lwz	$s2,8($inp)
++ 	lwz	$s3,12($inp)
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	lwz	$t0,0($inp)
+++	lwz	$t1,4($inp)
+++	lwz	$t2,8($inp)
+++	lwz	$t3,12($inp)
+++	rotlwi	$s0,$t0,8
+++	rotlwi	$s1,$t1,8
+++	rotlwi	$s2,$t2,8
+++	rotlwi	$s3,$t3,8
+++	rlwimi	$s0,$t0,24,0,7
+++	rlwimi	$s1,$t1,24,0,7
+++	rlwimi	$s2,$t2,24,0,7
+++	rlwimi	$s3,$t3,24,0,7
+++	rlwimi	$s0,$t0,24,16,23
+++	rlwimi	$s1,$t1,24,16,23
+++	rlwimi	$s2,$t2,24,16,23
+++	rlwimi	$s3,$t3,24,16,23
+++___
+++$code.=<<___;
++ 	bl	LAES_Td
++ 	bl	Lppc_AES_decrypt_compact
+++	$POP	$out,`$FRAME-$SIZE_T*19`($sp)
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	rotlwi	$t0,$s0,8
+++	rotlwi	$t1,$s1,8
+++	rotlwi	$t2,$s2,8
+++	rotlwi	$t3,$s3,8
+++	rlwimi	$t0,$s0,24,0,7
+++	rlwimi	$t1,$s1,24,0,7
+++	rlwimi	$t2,$s2,24,0,7
+++	rlwimi	$t3,$s3,24,0,7
+++	rlwimi	$t0,$s0,24,16,23
+++	rlwimi	$t1,$s1,24,16,23
+++	rlwimi	$t2,$s2,24,16,23
+++	rlwimi	$t3,$s3,24,16,23
+++	stw	$t0,0($out)
+++	stw	$t1,4($out)
+++	stw	$t2,8($out)
+++	stw	$t3,12($out)
+++___
+++$code.=<<___ if (!$LITTLE_ENDIAN);
++ 	stw	$s0,0($out)
++ 	stw	$s1,4($out)
++ 	stw	$s2,8($out)
++ 	stw	$s3,12($out)
+++___
+++$code.=<<___;
++ 	b	Ldec_done
++ 
++ Ldec_unaligned:
++@@ -851,6 +938,7 @@ Ldec_xpage:
++ 
++ 	bl	LAES_Td
++ 	bl	Lppc_AES_decrypt_compact
+++	$POP	$out,`$FRAME-$SIZE_T*19`($sp)
++ 
++ 	extrwi	$acc00,$s0,8,0
++ 	extrwi	$acc01,$s0,8,8
++@@ -883,8 +971,6 @@ Ldec_xpage:
++ 
++ Ldec_done:
++ 	$POP	r0,`$FRAME+$LRSAVE`($sp)
++-	$POP	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$POP	r13,`$FRAME-$SIZE_T*19`($sp)
++ 	$POP	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$POP	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$POP	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -1355,6 +1441,7 @@ Ldec_compact_done:
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.AES_decrypt,.-.AES_decrypt
++ 
++ .asciz	"AES for PPC, CRYPTOGAMS by <appro\@openssl.org>"
++ .align	7
++--- a/crypto/bn/asm/ppc-mont.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/bn/asm/ppc-mont.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -325,6 +325,7 @@ Lcopy:				; copy or in-place refresh
++ 	.long	0
++ 	.byte	0,12,4,0,0x80,12,6,0
++ 	.long	0
+++.size	.bn_mul_mont_int,.-.bn_mul_mont_int
++ 
++ .asciz  "Montgomery Multiplication for PPC, CRYPTOGAMS by <appro\@openssl.org>"
++ ___
++--- a/crypto/perlasm/ppc-xlate.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/perlasm/ppc-xlate.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -27,7 +27,8 @@ my $globl = sub {
++ 	/osx/		&& do { $name = "_$name";
++ 				last;
++ 			      };
++-	/linux.*32/	&& do {	$ret .= ".globl	$name\n";
+++	/linux.*(32|64le)/
+++			&& do {	$ret .= ".globl	$name\n";
++ 				$ret .= ".type	$name,\@function";
++ 				last;
++ 			      };
++@@ -37,7 +38,6 @@ my $globl = sub {
++ 				$ret .= ".align	3\n";
++ 				$ret .= "$name:\n";
++ 				$ret .= ".quad	.$name,.TOC.\@tocbase,0\n";
++-				$ret .= ".size	$name,24\n";
++ 				$ret .= ".previous\n";
++ 
++ 				$name = ".$name";
++@@ -50,7 +50,9 @@ my $globl = sub {
++     $ret;
++ };
++ my $text = sub {
++-    ($flavour =~ /aix/) ? ".csect" : ".text";
+++    my $ret = ($flavour =~ /aix/) ? ".csect\t.text[PR],7" : ".text";
+++    $ret = ".abiversion	2\n".$ret	if ($flavour =~ /linux.*64le/);
+++    $ret;
++ };
++ my $machine = sub {
++     my $junk = shift;
++@@ -62,9 +64,12 @@ my $machine = sub {
++     ".machine	$arch";
++ };
++ my $size = sub {
++-    if ($flavour =~ /linux.*32/)
+++    if ($flavour =~ /linux/)
++     {	shift;
++-	".size	" . join(",",@_);
+++	my $name = shift; $name =~ s|^[\.\_]||;
+++	my $ret  = ".size	$name,.-".($flavour=~/64$/?".":"").$name;
+++	$ret .= "\n.size	.$name,.-.$name" if ($flavour=~/64$/);
+++	$ret;
++     }
++     else
++     {	"";	}
++@@ -77,6 +82,25 @@ my $asciz = sub {
++     else
++     {	"";	}
++ };
+++my $quad = sub {
+++    shift;
+++    my @ret;
+++    my ($hi,$lo);
+++    for (@_) {
+++	if (/^0x([0-9a-f]*?)([0-9a-f]{1,8})$/io)
+++	{  $hi=$1?"0x$1":"0"; $lo="0x$2";  }
+++	elsif (/^([0-9]+)$/o)
+++	{  $hi=$1>>32; $lo=$1&0xffffffff;  } # error-prone with 32-bit perl
+++	else
+++	{  $hi=undef; $lo=$_; }
+++
+++	if (defined($hi))
+++	{  push(@ret,$flavour=~/le$/o?".long\t$lo,$hi":".long\t$hi,$lo");  }
+++	else
+++	{  push(@ret,".quad	$lo");  }
+++    }
+++    join("\n",@ret);
+++};
++ 
++ ################################################################
++ # simplified mnemonics not handled by at least one assembler
++@@ -122,6 +146,46 @@ my $extrdi = sub {
++     $b = ($b+$n)&63; $n = 64-$n;
++     "	rldicl	$ra,$rs,$b,$n";
++ };
+++my $vmr = sub {
+++    my ($f,$vx,$vy) = @_;
+++    "	vor	$vx,$vy,$vy";
+++};
+++
+++# PowerISA 2.06 stuff
+++sub vsxmem_op {
+++    my ($f, $vrt, $ra, $rb, $op) = @_;
+++    "	.long	".sprintf "0x%X",(31<<26)|($vrt<<21)|($ra<<16)|($rb<<11)|($op*2+1);
+++}
+++# made-up unaligned memory reference AltiVec/VMX instructions
+++my $lvx_u	= sub {	vsxmem_op(@_, 844); };	# lxvd2x
+++my $stvx_u	= sub {	vsxmem_op(@_, 972); };	# stxvd2x
+++my $lvdx_u	= sub {	vsxmem_op(@_, 588); };	# lxsdx
+++my $stvdx_u	= sub {	vsxmem_op(@_, 716); };	# stxsdx
+++my $lvx_4w	= sub { vsxmem_op(@_, 780); };	# lxvw4x
+++my $stvx_4w	= sub { vsxmem_op(@_, 908); };	# stxvw4x
+++
+++# PowerISA 2.07 stuff
+++sub vcrypto_op {
+++    my ($f, $vrt, $vra, $vrb, $op) = @_;
+++    "	.long	".sprintf "0x%X",(4<<26)|($vrt<<21)|($vra<<16)|($vrb<<11)|$op;
+++}
+++my $vcipher	= sub { vcrypto_op(@_, 1288); };
+++my $vcipherlast	= sub { vcrypto_op(@_, 1289); };
+++my $vncipher	= sub { vcrypto_op(@_, 1352); };
+++my $vncipherlast= sub { vcrypto_op(@_, 1353); };
+++my $vsbox	= sub { vcrypto_op(@_, 0, 1480); };
+++my $vshasigmad	= sub { my ($st,$six)=splice(@_,-2); vcrypto_op(@_, $st<<4|$six, 1730); };
+++my $vshasigmaw	= sub { my ($st,$six)=splice(@_,-2); vcrypto_op(@_, $st<<4|$six, 1666); };
+++my $vpmsumb	= sub { vcrypto_op(@_, 1032); };
+++my $vpmsumd	= sub { vcrypto_op(@_, 1224); };
+++my $vpmsubh	= sub { vcrypto_op(@_, 1096); };
+++my $vpmsumw	= sub { vcrypto_op(@_, 1160); };
+++my $vaddudm	= sub { vcrypto_op(@_, 192);  };
+++
+++my $mtsle	= sub {
+++    my ($f, $arg) = @_;
+++    "	.long	".sprintf "0x%X",(31<<26)|($arg<<21)|(147*2);
+++};
++ 
++ while($line=<>) {
++ 
++@@ -138,7 +202,10 @@ while($line=<>) {
++     {
++ 	$line =~ s|(^[\.\w]+)\:\s*||;
++ 	my $label = $1;
++-	printf "%s:",($GLOBALS{$label} or $label) if ($label);
+++	if ($label) {
+++	    printf "%s:",($GLOBALS{$label} or $label);
+++	    printf "\n.localentry\t$GLOBALS{$label},0"	if ($GLOBALS{$label} && $flavour =~ /linux.*64le/);
+++	}
++     }
++ 
++     {
++@@ -147,7 +214,7 @@ while($line=<>) {
++ 	my $mnemonic = $2;
++ 	my $f = $3;
++ 	my $opcode = eval("\$$mnemonic");
++-	$line =~ s|\bc?[rf]([0-9]+)\b|$1|g if ($c ne "." and $flavour !~ /osx/);
+++	$line =~ s/\b(c?[rf]|v|vs)([0-9]+)\b/$2/g if ($c ne "." and $flavour !~ /osx/);
++ 	if (ref($opcode) eq 'CODE') { $line = &$opcode($f,split(',',$line)); }
++ 	elsif ($mnemonic)           { $line = $c.$mnemonic.$f."\t".$line; }
++     }
++--- a/crypto/bn/asm/ppc.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/bn/asm/ppc.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -392,6 +392,7 @@ $data=<<EOF;
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,2,0
++ 	.long	0
+++.size	.bn_sqr_comba4,.-.bn_sqr_comba4
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -819,6 +820,7 @@ $data=<<EOF;
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,2,0
++ 	.long	0
+++.size	.bn_sqr_comba8,.-.bn_sqr_comba8
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -972,6 +974,7 @@ $data=<<EOF;
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,3,0
++ 	.long	0
+++.size	.bn_mul_comba4,.-.bn_mul_comba4
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1510,6 +1513,7 @@ $data=<<EOF;
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,3,0
++ 	.long	0
+++.size	.bn_mul_comba8,.-.bn_mul_comba8
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1560,6 +1564,7 @@ Lppcasm_sub_adios:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,4,0
++ 	.long	0
+++.size	.bn_sub_words,.-.bn_sub_words
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1605,6 +1610,7 @@ Lppcasm_add_adios:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,4,0
++ 	.long	0
+++.size	.bn_add_words,.-.bn_add_words
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1720,6 +1726,7 @@ Lppcasm_div9:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,3,0
++ 	.long	0
+++.size	.bn_div_words,.-.bn_div_words
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1761,6 +1768,7 @@ Lppcasm_sqr_adios:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,3,0
++ 	.long	0
+++.size	.bn_sqr_words,.-.bn_sqr_words
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1866,6 +1874,7 @@ Lppcasm_mw_OVER:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,4,0
++ 	.long	0
+++.size	bn_mul_words,.-bn_mul_words
++ 
++ #
++ #	NOTE:	The following label name should be changed to
++@@ -1991,6 +2000,7 @@ Lppcasm_maw_adios:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,4,0
++ 	.long	0
+++.size	.bn_mul_add_words,.-.bn_mul_add_words
++ 	.align	4
++ EOF
++ $data =~ s/\`([^\`]*)\`/eval $1/gem;
++--- a/crypto/ppccpuid.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/ppccpuid.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -31,6 +31,7 @@ $code=<<___;
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.OPENSSL_ppc64_probe,.-.OPENSSL_ppc64_probe
++ 
++ .globl	.OPENSSL_altivec_probe
++ .align	4
++@@ -39,6 +40,17 @@ $code=<<___;
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.OPENSSL_altivec_probe,.-..OPENSSL_altivec_probe
+++
+++.globl	.OPENSSL_crypto207_probe
+++.align	4
+++.OPENSSL_crypto207_probe:
+++	lvx_u	v0,0,r1
+++	vcipher	v0,v0,v0
+++	blr
+++	.long	0
+++	.byte	0,12,0x14,0,0,0,0,0
+++.size	.OPENSSL_crypto207_probe,.-.OPENSSL_crypto207_probe
++ 
++ .globl	.OPENSSL_wipe_cpu
++ .align	4
++@@ -71,6 +83,7 @@ $code=<<___;
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.OPENSSL_wipe_cpu,.-.OPENSSL_wipe_cpu
++ 
++ .globl	.OPENSSL_atomic_add
++ .align	4
++@@ -84,6 +97,7 @@ Ladd:	lwarx	r5,0,r3
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,2,0
++ 	.long	0
+++.size	.OPENSSL_atomic_add,.-.OPENSSL_atomic_add
++ 
++ .globl	.OPENSSL_rdtsc
++ .align	4
++@@ -93,6 +107,7 @@ Ladd:	lwarx	r5,0,r3
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.OPENSSL_rdtsc,.-.OPENSSL_rdtsc
++ 
++ .globl	.OPENSSL_cleanse
++ .align	4
++@@ -125,7 +140,99 @@ Laligned:
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,2,0
++ 	.long	0
+++.size	.OPENSSL_cleanse,.-.OPENSSL_cleanse
+++___
+++{
+++my ($out,$cnt,$max)=("r3","r4","r5");
+++my ($tick,$lasttick)=("r6","r7");
+++my ($diff,$lastdiff)=("r8","r9");
+++
+++$code.=<<___;
+++.globl	.OPENSSL_instrument_bus
+++.align	4
+++.OPENSSL_instrument_bus:
+++	mtctr	$cnt
+++
+++	mftb	$lasttick		# collect 1st tick
+++	li	$diff,0
+++
+++	dcbf	0,$out			# flush cache line
+++	lwarx	$tick,0,$out		# load and lock
+++	add	$tick,$tick,$diff
+++	stwcx.	$tick,0,$out
+++	stwx	$tick,0,$out
+++
+++Loop:	mftb	$tick
+++	sub	$diff,$tick,$lasttick
+++	mr	$lasttick,$tick
+++	dcbf	0,$out			# flush cache line
+++	lwarx	$tick,0,$out		# load and lock
+++	add	$tick,$tick,$diff
+++	stwcx.	$tick,0,$out
+++	stwx	$tick,0,$out
+++	addi	$out,$out,4		# ++$out
+++	bdnz	Loop
+++
+++	mr	r3,$cnt
+++	blr
+++	.long	0
+++	.byte	0,12,0x14,0,0,0,2,0
+++	.long	0
+++.size	.OPENSSL_instrument_bus,.-.OPENSSL_instrument_bus
+++
+++.globl	.OPENSSL_instrument_bus2
+++.align	4
+++.OPENSSL_instrument_bus2:
+++	mr	r0,$cnt
+++	slwi	$cnt,$cnt,2
+++
+++	mftb	$lasttick		# collect 1st tick
+++	li	$diff,0
+++
+++	dcbf	0,$out			# flush cache line
+++	lwarx	$tick,0,$out		# load and lock
+++	add	$tick,$tick,$diff
+++	stwcx.	$tick,0,$out
+++	stwx	$tick,0,$out
+++
+++	mftb	$tick			# collect 1st diff
+++	sub	$diff,$tick,$lasttick
+++	mr	$lasttick,$tick
+++	mr	$lastdiff,$diff
+++Loop2:
+++	dcbf	0,$out			# flush cache line
+++	lwarx	$tick,0,$out		# load and lock
+++	add	$tick,$tick,$diff
+++	stwcx.	$tick,0,$out
+++	stwx	$tick,0,$out
+++
+++	addic.	$max,$max,-1
+++	beq	Ldone2
+++
+++	mftb	$tick
+++	sub	$diff,$tick,$lasttick
+++	mr	$lasttick,$tick
+++	cmplw	7,$diff,$lastdiff
+++	mr	$lastdiff,$diff
+++
+++	mfcr	$tick			# pull cr
+++	not	$tick,$tick		# flip bits
+++	rlwinm	$tick,$tick,1,29,29	# isolate flipped eq bit and scale
+++
+++	sub.	$cnt,$cnt,$tick		# conditional --$cnt
+++	add	$out,$out,$tick		# conditional ++$out
+++	bne	Loop2
+++
+++Ldone2:
+++	srwi	$cnt,$cnt,2
+++	sub	r3,r0,$cnt
+++	blr
+++	.long	0
+++	.byte	0,12,0x14,0,0,0,3,0
+++	.long	0
+++.size	.OPENSSL_instrument_bus2,.-.OPENSSL_instrument_bus2
++ ___
+++}
++ 
++ $code =~ s/\`([^\`]*)\`/eval $1/gem;
++ print $code;
++--- a/crypto/sha/asm/sha1-ppc.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/sha/asm/sha1-ppc.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -9,8 +9,7 @@
++ 
++ # I let hardware handle unaligned input(*), except on page boundaries
++ # (see below for details). Otherwise straightforward implementation
++-# with X vector in register bank. The module is big-endian [which is
++-# not big deal as there're no little-endian targets left around].
+++# with X vector in register bank.
++ #
++ # (*) this means that this module is inappropriate for PPC403? Does
++ #     anybody know if pre-POWER3 can sustain unaligned load?
++@@ -38,6 +37,10 @@ if ($flavour =~ /64/) {
++ 	$PUSH	="stw";
++ } else { die "nonsense $flavour"; }
++ 
+++# Define endianess based on flavour
+++# i.e.: linux64le
+++$LITTLE_ENDIAN = ($flavour=~/le$/) ? $SIZE_T : 0;
+++
++ $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++ ( $xlate="${dir}ppc-xlate.pl" and -f $xlate ) or
++ ( $xlate="${dir}../../perlasm/ppc-xlate.pl" and -f $xlate) or
++@@ -68,14 +71,28 @@ $T  ="r12";
++ @X=("r16","r17","r18","r19","r20","r21","r22","r23",
++     "r24","r25","r26","r27","r28","r29","r30","r31");
++ 
+++sub loadbe {
+++my ($dst, $src, $temp_reg) = @_;
+++$code.=<<___ if (!$LITTLE_ENDIAN);
+++	lwz	$dst,$src
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	lwz	$temp_reg,$src
+++	rotlwi	$dst,$temp_reg,8
+++	rlwimi	$dst,$temp_reg,24,0,7
+++	rlwimi	$dst,$temp_reg,24,16,23
+++___
+++}
+++
++ sub BODY_00_19 {
++ my ($i,$a,$b,$c,$d,$e,$f)=@_;
++ my $j=$i+1;
++-$code.=<<___ if ($i==0);
++-	lwz	@X[$i],`$i*4`($inp)
++-___
+++
+++	# Since the last value of $f is discarded, we can use
+++	# it as a temp reg to swap byte-order when needed.
+++	loadbe("@X[$i]","`$i*4`($inp)",$f) if ($i==0);
+++	loadbe("@X[$j]","`$j*4`($inp)",$f) if ($i<15);
++ $code.=<<___ if ($i<15);
++-	lwz	@X[$j],`$j*4`($inp)
++ 	add	$f,$K,$e
++ 	rotlwi	$e,$a,5
++ 	add	$f,$f,@X[$i]
++@@ -108,31 +125,31 @@ my ($i,$a,$b,$c,$d,$e,$f)=@_;
++ my $j=$i+1;
++ $code.=<<___ if ($i<79);
++ 	add	$f,$K,$e
+++	xor	$t0,$b,$d
++ 	rotlwi	$e,$a,5
++ 	xor	@X[$j%16],@X[$j%16],@X[($j+2)%16]
++ 	add	$f,$f,@X[$i%16]
++-	xor	$t0,$b,$c
+++	xor	$t0,$t0,$c
++ 	xor	@X[$j%16],@X[$j%16],@X[($j+8)%16]
++-	add	$f,$f,$e
+++	add	$f,$f,$t0
++ 	rotlwi	$b,$b,30
++-	xor	$t0,$t0,$d
++ 	xor	@X[$j%16],@X[$j%16],@X[($j+13)%16]
++-	add	$f,$f,$t0
+++	add	$f,$f,$e
++ 	rotlwi	@X[$j%16],@X[$j%16],1
++ ___
++ $code.=<<___ if ($i==79);
++ 	add	$f,$K,$e
+++	xor	$t0,$b,$d
++ 	rotlwi	$e,$a,5
++ 	lwz	r16,0($ctx)
++ 	add	$f,$f,@X[$i%16]
++-	xor	$t0,$b,$c
+++	xor	$t0,$t0,$c
++ 	lwz	r17,4($ctx)
++-	add	$f,$f,$e
+++	add	$f,$f,$t0
++ 	rotlwi	$b,$b,30
++ 	lwz	r18,8($ctx)
++-	xor	$t0,$t0,$d
++ 	lwz	r19,12($ctx)
++-	add	$f,$f,$t0
+++	add	$f,$f,$e
++ 	lwz	r20,16($ctx)
++ ___
++ }
++@@ -316,6 +333,7 @@ $code.=<<___;
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	.sha1_block_data_order,.-.sha1_block_data_order
++ ___
++ $code.=<<___;
++ .asciz	"SHA1 block transform for PPC, CRYPTOGAMS by <appro\@fy.chalmers.se>"
++--- a/crypto/sha/asm/sha512-ppc.pl	2015-01-08 22:00:36.000000000 +0800
+++++ b/crypto/sha/asm/sha512-ppc.pl	2015-01-22 19:13:57.000000000 +0800
++@@ -1,7 +1,7 @@
++ #!/usr/bin/env perl
++ 
++ # ====================================================================
++-# Written by Andy Polyakov <appro@fy.chalmers.se> for the OpenSSL
+++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++ # project. The module is, however, dual licensed under OpenSSL and
++ # CRYPTOGAMS licenses depending on where you obtain it. For further
++ # details see http://www.openssl.org/~appro/cryptogams/.
++@@ -9,8 +9,7 @@
++ 
++ # I let hardware handle unaligned input, except on page boundaries
++ # (see below for details). Otherwise straightforward implementation
++-# with X vector in register bank. The module is big-endian [which is
++-# not big deal as there're no little-endian targets left around].
+++# with X vector in register bank.
++ 
++ #			sha256		|	sha512
++ # 			-m64	-m32	|	-m64	-m32
++@@ -56,6 +55,8 @@ if ($flavour =~ /64/) {
++ 	$PUSH="stw";
++ } else { die "nonsense $flavour"; }
++ 
+++$LITTLE_ENDIAN = ($flavour=~/le$/) ? $SIZE_T : 0;
+++
++ $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++ ( $xlate="${dir}ppc-xlate.pl" and -f $xlate ) or
++ ( $xlate="${dir}../../perlasm/ppc-xlate.pl" and -f $xlate) or
++@@ -64,7 +65,7 @@ die "can't locate ppc-xlate.pl";
++ open STDOUT,"| $^X $xlate $flavour $output" || die "can't call $xlate: $!";
++ 
++ if ($output =~ /512/) {
++-	$func="sha512_block_data_order";
+++	$func="sha512_block_data_order";
++ 	$SZ=8;
++ 	@Sigma0=(28,34,39);
++ 	@Sigma1=(14,18,41);
++@@ -76,7 +77,7 @@ if ($output =~ /512/) {
++ 	$ROR="rotrdi";
++ 	$SHR="srdi";
++ } else {
++-	$func="sha256_block_data_order";
+++	$func="sha256_block_data_order";
++ 	$SZ=4;
++ 	@Sigma0=( 2,13,22);
++ 	@Sigma1=( 6,11,25);
++@@ -110,7 +111,7 @@ $B  ="r9";
++ $C  ="r10";
++ $D  ="r11";
++ $E  ="r12";
++-$F  ="r13";	$F="r2" if ($SIZE_T==8);# reassigned to exempt TLS pointer
+++$F  =$t1;	$t1 = "r0";	# stay away from "r13";
++ $G  ="r14";
++ $H  ="r15";
++ 
++@@ -118,24 +119,23 @@ $H  ="r15";
++ @X=("r16","r17","r18","r19","r20","r21","r22","r23",
++     "r24","r25","r26","r27","r28","r29","r30","r31");
++ 
++-$inp="r31";	# reassigned $inp! aliases with @X[15]
+++$inp="r31" if($SZ==4 || $SIZE_T==8);	# reassigned $inp! aliases with @X[15]
++ 
++ sub ROUND_00_15 {
++ my ($i,$a,$b,$c,$d,$e,$f,$g,$h)=@_;
++ $code.=<<___;
++-	$LD	$T,`$i*$SZ`($Tbl)
++ 	$ROR	$a0,$e,$Sigma1[0]
++ 	$ROR	$a1,$e,$Sigma1[1]
++ 	and	$t0,$f,$e
++-	andc	$t1,$g,$e
++-	add	$T,$T,$h
++ 	xor	$a0,$a0,$a1
+++	add	$h,$h,$t1
+++	andc	$t1,$g,$e
++ 	$ROR	$a1,$a1,`$Sigma1[2]-$Sigma1[1]`
++ 	or	$t0,$t0,$t1		; Ch(e,f,g)
++-	add	$T,$T,@X[$i]
+++	add	$h,$h,@X[$i%16]
++ 	xor	$a0,$a0,$a1		; Sigma1(e)
++-	add	$T,$T,$t0
++-	add	$T,$T,$a0
+++	add	$h,$h,$t0
+++	add	$h,$h,$a0
++ 
++ 	$ROR	$a0,$a,$Sigma0[0]
++ 	$ROR	$a1,$a,$Sigma0[1]
++@@ -146,9 +146,14 @@ $code.=<<___;
++ 	xor	$t0,$t0,$t1
++ 	and	$t1,$b,$c
++ 	xor	$a0,$a0,$a1		; Sigma0(a)
++-	add	$d,$d,$T
+++	add	$d,$d,$h
++ 	xor	$t0,$t0,$t1		; Maj(a,b,c)
++-	add	$h,$T,$a0
+++___
+++$code.=<<___ if ($i<15);
+++	$LD	$t1,`($i+1)*$SZ`($Tbl)
+++___
+++$code.=<<___;
+++	add	$h,$h,$a0
++ 	add	$h,$h,$t0
++ 
++ ___
++@@ -169,10 +174,11 @@ $code.=<<___;
++ 	add	@X[$i],@X[$i],@X[($i+9)%16]
++ 	xor	$a0,$a0,$a1		; sigma0(X[(i+1)&0x0f])
++ 	xor	$t0,$t0,$t1		; sigma1(X[(i+14)&0x0f])
+++	$LD	$t1,`$i*$SZ`($Tbl)
++ 	add	@X[$i],@X[$i],$a0
++ 	add	@X[$i],@X[$i],$t0
++ ___
++-&ROUND_00_15($i,$a,$b,$c,$d,$e,$f,$g,$h);
+++&ROUND_00_15($i+16,$a,$b,$c,$d,$e,$f,$g,$h);
++ }
++ 
++ $code=<<___;
++@@ -188,8 +194,6 @@ $func:
++ 
++ 	$PUSH	$ctx,`$FRAME-$SIZE_T*22`($sp)
++ 
++-	$PUSH	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$PUSH	r13,`$FRAME-$SIZE_T*19`($sp)
++ 	$PUSH	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$PUSH	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$PUSH	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -209,7 +213,10 @@ $func:
++ 	$PUSH	r30,`$FRAME-$SIZE_T*2`($sp)
++ 	$PUSH	r31,`$FRAME-$SIZE_T*1`($sp)
++ 	$PUSH	r0,`$FRAME+$LRSAVE`($sp)
+++___
++ 
+++if ($SZ==4 || $SIZE_T==8) {
+++$code.=<<___;
++ 	$LD	$A,`0*$SZ`($ctx)
++ 	mr	$inp,r4				; incarnate $inp
++ 	$LD	$B,`1*$SZ`($ctx)
++@@ -219,7 +226,16 @@ $func:
++ 	$LD	$F,`5*$SZ`($ctx)
++ 	$LD	$G,`6*$SZ`($ctx)
++ 	$LD	$H,`7*$SZ`($ctx)
+++___
+++} else {
+++  for ($i=16;$i<32;$i++) {
+++    $code.=<<___;
+++	lwz	r$i,`$LITTLE_ENDIAN^(4*($i-16))`($ctx)
+++___
+++  }
+++}
++ 
+++$code.=<<___;
++ 	bl	LPICmeup
++ LPICedup:
++ 	andi.	r0,$inp,3
++@@ -255,6 +271,9 @@ Lunaligned:
++ Lcross_page:
++ 	li	$t1,`16*$SZ/4`
++ 	mtctr	$t1
+++___
+++if ($SZ==4 || $SIZE_T==8) {
+++$code.=<<___;
++ 	addi	r20,$sp,$LOCALS			; aligned spot below the frame
++ Lmemcpy:
++ 	lbz	r16,0($inp)
++@@ -268,7 +287,26 @@ Lmemcpy:
++ 	stb	r19,3(r20)
++ 	addi	r20,r20,4
++ 	bdnz	Lmemcpy
+++___
+++} else {
+++$code.=<<___;
+++	addi	r12,$sp,$LOCALS			; aligned spot below the frame
+++Lmemcpy:
+++	lbz	r8,0($inp)
+++	lbz	r9,1($inp)
+++	lbz	r10,2($inp)
+++	lbz	r11,3($inp)
+++	addi	$inp,$inp,4
+++	stb	r8,0(r12)
+++	stb	r9,1(r12)
+++	stb	r10,2(r12)
+++	stb	r11,3(r12)
+++	addi	r12,r12,4
+++	bdnz	Lmemcpy
+++___
+++}
++ 
+++$code.=<<___;
++ 	$PUSH	$inp,`$FRAME-$SIZE_T*26`($sp)	; save real inp
++ 	addi	$t1,$sp,`$LOCALS+16*$SZ`	; fictitious end pointer
++ 	addi	$inp,$sp,$LOCALS		; fictitious inp pointer
++@@ -283,8 +321,6 @@ Lmemcpy:
++ 
++ Ldone:
++ 	$POP	r0,`$FRAME+$LRSAVE`($sp)
++-	$POP	$toc,`$FRAME-$SIZE_T*20`($sp)
++-	$POP	r13,`$FRAME-$SIZE_T*19`($sp)
++ 	$POP	r14,`$FRAME-$SIZE_T*18`($sp)
++ 	$POP	r15,`$FRAME-$SIZE_T*17`($sp)
++ 	$POP	r16,`$FRAME-$SIZE_T*16`($sp)
++@@ -309,27 +345,48 @@ Ldone:
++ 	.long	0
++ 	.byte	0,12,4,1,0x80,18,3,0
++ 	.long	0
+++___
++ 
+++if ($SZ==4 || $SIZE_T==8) {
+++$code.=<<___;
++ .align	4
++ Lsha2_block_private:
+++	$LD	$t1,0($Tbl)
++ ___
++ for($i=0;$i<16;$i++) {
++-$code.=<<___ if ($SZ==4);
+++$code.=<<___ if ($SZ==4 && !$LITTLE_ENDIAN);
++ 	lwz	@X[$i],`$i*$SZ`($inp)
++ ___
+++$code.=<<___ if ($SZ==4 && $LITTLE_ENDIAN);
+++	lwz	$a0,`$i*$SZ`($inp)
+++	rotlwi	@X[$i],$a0,8
+++	rlwimi	@X[$i],$a0,24,0,7
+++	rlwimi	@X[$i],$a0,24,16,23
+++___
++ # 64-bit loads are split to 2x32-bit ones, as CPU can't handle
++ # unaligned 64-bit loads, only 32-bit ones...
++-$code.=<<___ if ($SZ==8);
+++$code.=<<___ if ($SZ==8 && !$LITTLE_ENDIAN);
++ 	lwz	$t0,`$i*$SZ`($inp)
++ 	lwz	@X[$i],`$i*$SZ+4`($inp)
++ 	insrdi	@X[$i],$t0,32,0
++ ___
+++$code.=<<___ if ($SZ==8 && $LITTLE_ENDIAN);
+++	lwz	$a0,`$i*$SZ`($inp)
+++	 lwz	$a1,`$i*$SZ+4`($inp)
+++	rotlwi	$t0,$a0,8
+++	 rotlwi	@X[$i],$a1,8
+++	rlwimi	$t0,$a0,24,0,7
+++	 rlwimi	@X[$i],$a1,24,0,7
+++	rlwimi	$t0,$a0,24,16,23
+++	 rlwimi	@X[$i],$a1,24,16,23
+++	insrdi	@X[$i],$t0,32,0
+++___
++ 	&ROUND_00_15($i,@V);
++ 	unshift(@V,pop(@V));
++ }
++ $code.=<<___;
++-	li	$T,`$rounds/16-1`
++-	mtctr	$T
+++	li	$t0,`$rounds/16-1`
+++	mtctr	$t0
++ .align	4
++ Lrounds:
++ 	addi	$Tbl,$Tbl,`16*$SZ`
++@@ -377,7 +434,282 @@ $code.=<<___;
++ 	blr
++ 	.long	0
++ 	.byte	0,12,0x14,0,0,0,0,0
+++.size	$func,.-$func
+++___
+++} else {
+++########################################################################
+++# SHA512 for PPC32, X vector is off-loaded to stack...
+++#
+++#			|	sha512
+++#			|	-m32
+++# ----------------------+-----------------------
+++# PPC74x0,gcc-4.0.1	|	+48%
+++# POWER6,gcc-4.4.6	|	+124%(*)
+++# POWER7,gcc-4.4.6	|	+79%(*)
+++# e300,gcc-4.1.0	|	+167%
+++#
+++# (*)	~1/3 of -m64 result [and ~20% better than -m32 code generated
+++#	by xlc-12.1]
+++
+++my $XOFF=$LOCALS;
+++
+++my @V=map("r$_",(16..31));	# A..H
+++
+++my ($s0,$s1,$t0,$t1,$t2,$t3,$a0,$a1,$a2,$a3)=map("r$_",(0,5,6,8..12,14,15));
+++my ($x0,$x1)=("r3","r4");	# zaps $ctx and $inp
+++
+++sub ROUND_00_15_ppc32 {
+++my ($i,	$ahi,$alo,$bhi,$blo,$chi,$clo,$dhi,$dlo,
+++	$ehi,$elo,$fhi,$flo,$ghi,$glo,$hhi,$hlo)=@_;
+++
+++$code.=<<___;
+++	lwz	$t2,`$SZ*($i%16)+($LITTLE_ENDIAN^4)`($Tbl)
+++	 xor	$a0,$flo,$glo
+++	lwz	$t3,`$SZ*($i%16)+($LITTLE_ENDIAN^0)`($Tbl)
+++	 xor	$a1,$fhi,$ghi
+++	addc	$hlo,$hlo,$t0			; h+=x[i]
+++	stw	$t0,`$XOFF+0+$SZ*($i%16)`($sp)	; save x[i]
+++
+++	srwi	$s0,$elo,$Sigma1[0]
+++	srwi	$s1,$ehi,$Sigma1[0]
+++	 and	$a0,$a0,$elo
+++	adde	$hhi,$hhi,$t1
+++	 and	$a1,$a1,$ehi
+++	stw	$t1,`$XOFF+4+$SZ*($i%16)`($sp)
+++	srwi	$t0,$elo,$Sigma1[1]
+++	srwi	$t1,$ehi,$Sigma1[1]
+++	 addc	$hlo,$hlo,$t2			; h+=K512[i]
+++	insrwi	$s0,$ehi,$Sigma1[0],0
+++	insrwi	$s1,$elo,$Sigma1[0],0
+++	 xor	$a0,$a0,$glo			; Ch(e,f,g)
+++	 adde	$hhi,$hhi,$t3
+++	 xor	$a1,$a1,$ghi
+++	insrwi	$t0,$ehi,$Sigma1[1],0
+++	insrwi	$t1,$elo,$Sigma1[1],0
+++	 addc	$hlo,$hlo,$a0			; h+=Ch(e,f,g)
+++	srwi	$t2,$ehi,$Sigma1[2]-32
+++	srwi	$t3,$elo,$Sigma1[2]-32
+++	xor	$s0,$s0,$t0
+++	xor	$s1,$s1,$t1
+++	insrwi	$t2,$elo,$Sigma1[2]-32,0
+++	insrwi	$t3,$ehi,$Sigma1[2]-32,0
+++	 xor	$a0,$alo,$blo			; a^b, b^c in next round
+++	 adde	$hhi,$hhi,$a1
+++	 xor	$a1,$ahi,$bhi
+++	xor	$s0,$s0,$t2			; Sigma1(e)
+++	xor	$s1,$s1,$t3
+++
+++	srwi	$t0,$alo,$Sigma0[0]
+++	 and	$a2,$a2,$a0
+++	 addc	$hlo,$hlo,$s0			; h+=Sigma1(e)
+++	 and	$a3,$a3,$a1
+++	srwi	$t1,$ahi,$Sigma0[0]
+++	srwi	$s0,$ahi,$Sigma0[1]-32
+++	 adde	$hhi,$hhi,$s1
+++	srwi	$s1,$alo,$Sigma0[1]-32
+++	insrwi	$t0,$ahi,$Sigma0[0],0
+++	insrwi	$t1,$alo,$Sigma0[0],0
+++	 xor	$a2,$a2,$blo			; Maj(a,b,c)
+++	 addc	$dlo,$dlo,$hlo			; d+=h
+++	 xor	$a3,$a3,$bhi
+++	insrwi	$s0,$alo,$Sigma0[1]-32,0
+++	insrwi	$s1,$ahi,$Sigma0[1]-32,0
+++	 adde	$dhi,$dhi,$hhi
+++	srwi	$t2,$ahi,$Sigma0[2]-32
+++	srwi	$t3,$alo,$Sigma0[2]-32
+++	xor	$s0,$s0,$t0
+++	 addc	$hlo,$hlo,$a2			; h+=Maj(a,b,c)
+++	xor	$s1,$s1,$t1
+++	insrwi	$t2,$alo,$Sigma0[2]-32,0
+++	insrwi	$t3,$ahi,$Sigma0[2]-32,0
+++	 adde	$hhi,$hhi,$a3
+++___
+++$code.=<<___ if ($i>=15);
+++	lwz	$t0,`$XOFF+0+$SZ*(($i+2)%16)`($sp)
+++	lwz	$t1,`$XOFF+4+$SZ*(($i+2)%16)`($sp)
+++___
+++$code.=<<___ if ($i<15 && !$LITTLE_ENDIAN);
+++	lwz	$t1,`$SZ*($i+1)+0`($inp)
+++	lwz	$t0,`$SZ*($i+1)+4`($inp)
++ ___
+++$code.=<<___ if ($i<15 && $LITTLE_ENDIAN);
+++	lwz	$a2,`$SZ*($i+1)+0`($inp)
+++	 lwz	$a3,`$SZ*($i+1)+4`($inp)
+++	rotlwi	$t1,$a2,8
+++	 rotlwi	$t0,$a3,8
+++	rlwimi	$t1,$a2,24,0,7
+++	 rlwimi	$t0,$a3,24,0,7
+++	rlwimi	$t1,$a2,24,16,23
+++	 rlwimi	$t0,$a3,24,16,23
+++___
+++$code.=<<___;
+++	xor	$s0,$s0,$t2			; Sigma0(a)
+++	xor	$s1,$s1,$t3
+++	addc	$hlo,$hlo,$s0			; h+=Sigma0(a)
+++	adde	$hhi,$hhi,$s1
+++___
+++$code.=<<___ if ($i==15);
+++	lwz	$x0,`$XOFF+0+$SZ*(($i+1)%16)`($sp)
+++	lwz	$x1,`$XOFF+4+$SZ*(($i+1)%16)`($sp)
+++___
+++}
+++sub ROUND_16_xx_ppc32 {
+++my ($i,	$ahi,$alo,$bhi,$blo,$chi,$clo,$dhi,$dlo,
+++	$ehi,$elo,$fhi,$flo,$ghi,$glo,$hhi,$hlo)=@_;
+++
+++$code.=<<___;
+++	srwi	$s0,$t0,$sigma0[0]
+++	srwi	$s1,$t1,$sigma0[0]
+++	srwi	$t2,$t0,$sigma0[1]
+++	srwi	$t3,$t1,$sigma0[1]
+++	insrwi	$s0,$t1,$sigma0[0],0
+++	insrwi	$s1,$t0,$sigma0[0],0
+++	srwi	$a0,$t0,$sigma0[2]
+++	insrwi	$t2,$t1,$sigma0[1],0
+++	insrwi	$t3,$t0,$sigma0[1],0
+++	insrwi	$a0,$t1,$sigma0[2],0
+++	xor	$s0,$s0,$t2
+++	 lwz	$t2,`$XOFF+0+$SZ*(($i+14)%16)`($sp)
+++	srwi	$a1,$t1,$sigma0[2]
+++	xor	$s1,$s1,$t3
+++	 lwz	$t3,`$XOFF+4+$SZ*(($i+14)%16)`($sp)
+++	xor	$a0,$a0,$s0
+++	 srwi	$s0,$t2,$sigma1[0]
+++	xor	$a1,$a1,$s1
+++	 srwi	$s1,$t3,$sigma1[0]
+++	addc	$x0,$x0,$a0			; x[i]+=sigma0(x[i+1])
+++	 srwi	$a0,$t3,$sigma1[1]-32
+++	insrwi	$s0,$t3,$sigma1[0],0
+++	insrwi	$s1,$t2,$sigma1[0],0
+++	adde	$x1,$x1,$a1
+++	 srwi	$a1,$t2,$sigma1[1]-32
+++
+++	insrwi	$a0,$t2,$sigma1[1]-32,0
+++	srwi	$t2,$t2,$sigma1[2]
+++	insrwi	$a1,$t3,$sigma1[1]-32,0
+++	insrwi	$t2,$t3,$sigma1[2],0
+++	xor	$s0,$s0,$a0
+++	 lwz	$a0,`$XOFF+0+$SZ*(($i+9)%16)`($sp)
+++	srwi	$t3,$t3,$sigma1[2]
+++	xor	$s1,$s1,$a1
+++	 lwz	$a1,`$XOFF+4+$SZ*(($i+9)%16)`($sp)
+++	xor	$s0,$s0,$t2
+++	 addc	$x0,$x0,$a0			; x[i]+=x[i+9]
+++	xor	$s1,$s1,$t3
+++	 adde	$x1,$x1,$a1
+++	addc	$x0,$x0,$s0			; x[i]+=sigma1(x[i+14])
+++	adde	$x1,$x1,$s1
+++___
+++	($t0,$t1,$x0,$x1) = ($x0,$x1,$t0,$t1);
+++	&ROUND_00_15_ppc32(@_);
+++}
+++
+++$code.=<<___;
+++.align	4
+++Lsha2_block_private:
+++___
+++$code.=<<___ if (!$LITTLE_ENDIAN);
+++	lwz	$t1,0($inp)
+++	xor	$a2,@V[3],@V[5]		; B^C, magic seed
+++	lwz	$t0,4($inp)
+++	xor	$a3,@V[2],@V[4]
+++___
+++$code.=<<___ if ($LITTLE_ENDIAN);
+++	lwz	$a1,0($inp)
+++	xor	$a2,@V[3],@V[5]		; B^C, magic seed
+++	lwz	$a0,4($inp)
+++	xor	$a3,@V[2],@V[4]
+++	rotlwi	$t1,$a1,8
+++	 rotlwi	$t0,$a0,8
+++	rlwimi	$t1,$a1,24,0,7
+++	 rlwimi	$t0,$a0,24,0,7
+++	rlwimi	$t1,$a1,24,16,23
+++	 rlwimi	$t0,$a0,24,16,23
+++___
+++for($i=0;$i<16;$i++) {
+++	&ROUND_00_15_ppc32($i,@V);
+++	unshift(@V,pop(@V));	unshift(@V,pop(@V));
+++	($a0,$a1,$a2,$a3) = ($a2,$a3,$a0,$a1);
+++}
+++$code.=<<___;
+++	li	$a0,`$rounds/16-1`
+++	mtctr	$a0
+++.align	4
+++Lrounds:
+++	addi	$Tbl,$Tbl,`16*$SZ`
+++___
+++for(;$i<32;$i++) {
+++	&ROUND_16_xx_ppc32($i,@V);
+++	unshift(@V,pop(@V));	unshift(@V,pop(@V));
+++	($a0,$a1,$a2,$a3) = ($a2,$a3,$a0,$a1);
+++}
+++$code.=<<___;
+++	bdnz-	Lrounds
+++
+++	$POP	$ctx,`$FRAME-$SIZE_T*22`($sp)
+++	$POP	$inp,`$FRAME-$SIZE_T*23`($sp)	; inp pointer
+++	$POP	$num,`$FRAME-$SIZE_T*24`($sp)	; end pointer
+++	subi	$Tbl,$Tbl,`($rounds-16)*$SZ`	; rewind Tbl
+++
+++	lwz	$t0,`$LITTLE_ENDIAN^0`($ctx)
+++	lwz	$t1,`$LITTLE_ENDIAN^4`($ctx)
+++	lwz	$t2,`$LITTLE_ENDIAN^8`($ctx)
+++	lwz	$t3,`$LITTLE_ENDIAN^12`($ctx)
+++	lwz	$a0,`$LITTLE_ENDIAN^16`($ctx)
+++	lwz	$a1,`$LITTLE_ENDIAN^20`($ctx)
+++	lwz	$a2,`$LITTLE_ENDIAN^24`($ctx)
+++	addc	@V[1],@V[1],$t1
+++	lwz	$a3,`$LITTLE_ENDIAN^28`($ctx)
+++	adde	@V[0],@V[0],$t0
+++	lwz	$t0,`$LITTLE_ENDIAN^32`($ctx)
+++	addc	@V[3],@V[3],$t3
+++	lwz	$t1,`$LITTLE_ENDIAN^36`($ctx)
+++	adde	@V[2],@V[2],$t2
+++	lwz	$t2,`$LITTLE_ENDIAN^40`($ctx)
+++	addc	@V[5],@V[5],$a1
+++	lwz	$t3,`$LITTLE_ENDIAN^44`($ctx)
+++	adde	@V[4],@V[4],$a0
+++	lwz	$a0,`$LITTLE_ENDIAN^48`($ctx)
+++	addc	@V[7],@V[7],$a3
+++	lwz	$a1,`$LITTLE_ENDIAN^52`($ctx)
+++	adde	@V[6],@V[6],$a2
+++	lwz	$a2,`$LITTLE_ENDIAN^56`($ctx)
+++	addc	@V[9],@V[9],$t1
+++	lwz	$a3,`$LITTLE_ENDIAN^60`($ctx)
+++	adde	@V[8],@V[8],$t0
+++	stw	@V[0],`$LITTLE_ENDIAN^0`($ctx)
+++	stw	@V[1],`$LITTLE_ENDIAN^4`($ctx)
+++	addc	@V[11],@V[11],$t3
+++	stw	@V[2],`$LITTLE_ENDIAN^8`($ctx)
+++	stw	@V[3],`$LITTLE_ENDIAN^12`($ctx)
+++	adde	@V[10],@V[10],$t2
+++	stw	@V[4],`$LITTLE_ENDIAN^16`($ctx)
+++	stw	@V[5],`$LITTLE_ENDIAN^20`($ctx)
+++	addc	@V[13],@V[13],$a1
+++	stw	@V[6],`$LITTLE_ENDIAN^24`($ctx)
+++	stw	@V[7],`$LITTLE_ENDIAN^28`($ctx)
+++	adde	@V[12],@V[12],$a0
+++	stw	@V[8],`$LITTLE_ENDIAN^32`($ctx)
+++	stw	@V[9],`$LITTLE_ENDIAN^36`($ctx)
+++	addc	@V[15],@V[15],$a3
+++	stw	@V[10],`$LITTLE_ENDIAN^40`($ctx)
+++	stw	@V[11],`$LITTLE_ENDIAN^44`($ctx)
+++	adde	@V[14],@V[14],$a2
+++	stw	@V[12],`$LITTLE_ENDIAN^48`($ctx)
+++	stw	@V[13],`$LITTLE_ENDIAN^52`($ctx)
+++	stw	@V[14],`$LITTLE_ENDIAN^56`($ctx)
+++	stw	@V[15],`$LITTLE_ENDIAN^60`($ctx)
+++
+++	addi	$inp,$inp,`16*$SZ`		; advance inp
+++	$PUSH	$inp,`$FRAME-$SIZE_T*23`($sp)
+++	$UCMP	$inp,$num
+++	bne	Lsha2_block_private
+++	blr
+++	.long	0
+++	.byte	0,12,0x14,0,0,0,0,0
+++.size	$func,.-$func
+++___
+++}
++ 
++ # Ugly hack here, because PPC assembler syntax seem to vary too
++ # much from platforms to platform...
++@@ -395,46 +727,46 @@ LPICmeup:
++ 	.space	`64-9*4`
++ ___
++ $code.=<<___ if ($SZ==8);
++-	.long	0x428a2f98,0xd728ae22,0x71374491,0x23ef65cd
++-	.long	0xb5c0fbcf,0xec4d3b2f,0xe9b5dba5,0x8189dbbc
++-	.long	0x3956c25b,0xf348b538,0x59f111f1,0xb605d019
++-	.long	0x923f82a4,0xaf194f9b,0xab1c5ed5,0xda6d8118
++-	.long	0xd807aa98,0xa3030242,0x12835b01,0x45706fbe
++-	.long	0x243185be,0x4ee4b28c,0x550c7dc3,0xd5ffb4e2
++-	.long	0x72be5d74,0xf27b896f,0x80deb1fe,0x3b1696b1
++-	.long	0x9bdc06a7,0x25c71235,0xc19bf174,0xcf692694
++-	.long	0xe49b69c1,0x9ef14ad2,0xefbe4786,0x384f25e3
++-	.long	0x0fc19dc6,0x8b8cd5b5,0x240ca1cc,0x77ac9c65
++-	.long	0x2de92c6f,0x592b0275,0x4a7484aa,0x6ea6e483
++-	.long	0x5cb0a9dc,0xbd41fbd4,0x76f988da,0x831153b5
++-	.long	0x983e5152,0xee66dfab,0xa831c66d,0x2db43210
++-	.long	0xb00327c8,0x98fb213f,0xbf597fc7,0xbeef0ee4
++-	.long	0xc6e00bf3,0x3da88fc2,0xd5a79147,0x930aa725
++-	.long	0x06ca6351,0xe003826f,0x14292967,0x0a0e6e70
++-	.long	0x27b70a85,0x46d22ffc,0x2e1b2138,0x5c26c926
++-	.long	0x4d2c6dfc,0x5ac42aed,0x53380d13,0x9d95b3df
++-	.long	0x650a7354,0x8baf63de,0x766a0abb,0x3c77b2a8
++-	.long	0x81c2c92e,0x47edaee6,0x92722c85,0x1482353b
++-	.long	0xa2bfe8a1,0x4cf10364,0xa81a664b,0xbc423001
++-	.long	0xc24b8b70,0xd0f89791,0xc76c51a3,0x0654be30
++-	.long	0xd192e819,0xd6ef5218,0xd6990624,0x5565a910
++-	.long	0xf40e3585,0x5771202a,0x106aa070,0x32bbd1b8
++-	.long	0x19a4c116,0xb8d2d0c8,0x1e376c08,0x5141ab53
++-	.long	0x2748774c,0xdf8eeb99,0x34b0bcb5,0xe19b48a8
++-	.long	0x391c0cb3,0xc5c95a63,0x4ed8aa4a,0xe3418acb
++-	.long	0x5b9cca4f,0x7763e373,0x682e6ff3,0xd6b2b8a3
++-	.long	0x748f82ee,0x5defb2fc,0x78a5636f,0x43172f60
++-	.long	0x84c87814,0xa1f0ab72,0x8cc70208,0x1a6439ec
++-	.long	0x90befffa,0x23631e28,0xa4506ceb,0xde82bde9
++-	.long	0xbef9a3f7,0xb2c67915,0xc67178f2,0xe372532b
++-	.long	0xca273ece,0xea26619c,0xd186b8c7,0x21c0c207
++-	.long	0xeada7dd6,0xcde0eb1e,0xf57d4f7f,0xee6ed178
++-	.long	0x06f067aa,0x72176fba,0x0a637dc5,0xa2c898a6
++-	.long	0x113f9804,0xbef90dae,0x1b710b35,0x131c471b
++-	.long	0x28db77f5,0x23047d84,0x32caab7b,0x40c72493
++-	.long	0x3c9ebe0a,0x15c9bebc,0x431d67c4,0x9c100d4c
++-	.long	0x4cc5d4be,0xcb3e42b6,0x597f299c,0xfc657e2a
++-	.long	0x5fcb6fab,0x3ad6faec,0x6c44198c,0x4a475817
+++	.quad	0x428a2f98d728ae22,0x7137449123ef65cd
+++	.quad	0xb5c0fbcfec4d3b2f,0xe9b5dba58189dbbc
+++	.quad	0x3956c25bf348b538,0x59f111f1b605d019
+++	.quad	0x923f82a4af194f9b,0xab1c5ed5da6d8118
+++	.quad	0xd807aa98a3030242,0x12835b0145706fbe
+++	.quad	0x243185be4ee4b28c,0x550c7dc3d5ffb4e2
+++	.quad	0x72be5d74f27b896f,0x80deb1fe3b1696b1
+++	.quad	0x9bdc06a725c71235,0xc19bf174cf692694
+++	.quad	0xe49b69c19ef14ad2,0xefbe4786384f25e3
+++	.quad	0x0fc19dc68b8cd5b5,0x240ca1cc77ac9c65
+++	.quad	0x2de92c6f592b0275,0x4a7484aa6ea6e483
+++	.quad	0x5cb0a9dcbd41fbd4,0x76f988da831153b5
+++	.quad	0x983e5152ee66dfab,0xa831c66d2db43210
+++	.quad	0xb00327c898fb213f,0xbf597fc7beef0ee4
+++	.quad	0xc6e00bf33da88fc2,0xd5a79147930aa725
+++	.quad	0x06ca6351e003826f,0x142929670a0e6e70
+++	.quad	0x27b70a8546d22ffc,0x2e1b21385c26c926
+++	.quad	0x4d2c6dfc5ac42aed,0x53380d139d95b3df
+++	.quad	0x650a73548baf63de,0x766a0abb3c77b2a8
+++	.quad	0x81c2c92e47edaee6,0x92722c851482353b
+++	.quad	0xa2bfe8a14cf10364,0xa81a664bbc423001
+++	.quad	0xc24b8b70d0f89791,0xc76c51a30654be30
+++	.quad	0xd192e819d6ef5218,0xd69906245565a910
+++	.quad	0xf40e35855771202a,0x106aa07032bbd1b8
+++	.quad	0x19a4c116b8d2d0c8,0x1e376c085141ab53
+++	.quad	0x2748774cdf8eeb99,0x34b0bcb5e19b48a8
+++	.quad	0x391c0cb3c5c95a63,0x4ed8aa4ae3418acb
+++	.quad	0x5b9cca4f7763e373,0x682e6ff3d6b2b8a3
+++	.quad	0x748f82ee5defb2fc,0x78a5636f43172f60
+++	.quad	0x84c87814a1f0ab72,0x8cc702081a6439ec
+++	.quad	0x90befffa23631e28,0xa4506cebde82bde9
+++	.quad	0xbef9a3f7b2c67915,0xc67178f2e372532b
+++	.quad	0xca273eceea26619c,0xd186b8c721c0c207
+++	.quad	0xeada7dd6cde0eb1e,0xf57d4f7fee6ed178
+++	.quad	0x06f067aa72176fba,0x0a637dc5a2c898a6
+++	.quad	0x113f9804bef90dae,0x1b710b35131c471b
+++	.quad	0x28db77f523047d84,0x32caab7b40c72493
+++	.quad	0x3c9ebe0a15c9bebc,0x431d67c49c100d4c
+++	.quad	0x4cc5d4becb3e42b6,0x597f299cfc657e2a
+++	.quad	0x5fcb6fab3ad6faec,0x6c44198c4a475817
++ ___
++ $code.=<<___ if ($SZ==4);
++ 	.long	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5
