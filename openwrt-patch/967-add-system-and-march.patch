@@ -13,8 +13,8 @@
 -		cpuinfo:match("system type\t+: ([^\n]+)") or
 -		cpuinfo:match("Processor\t+: ([^\n]+)") or
 -		cpuinfo:match("model name\t+: ([^\n]+)")
-+	local system = cpuinfo:match("system type\t+: ([^\n]+)")
-+	local march = cpuinfo:match("cpu model\t+: ([^\n]+)")
++	local system = cpuinfo:match("platform\t+: ([^\n]+)")
++	local march = cpuinfo:match("cpu\t+: ([^\n]+)")
  
  	local model =
  		luci.util.pcdata(fs.readfile("/tmp/sysinfo/model")) or
