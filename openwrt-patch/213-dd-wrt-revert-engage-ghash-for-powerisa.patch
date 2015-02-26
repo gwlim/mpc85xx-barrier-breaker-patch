@@ -1,0 +1,24 @@
+--- /dev/null	2015-02-17 22:36:10.752814236 +0800
++++ ./package/libs/openssl/patches/225-ppc-ghash-fix.patch	2015-02-18 00:54:03.641986293 +0800
+@@ -0,0 +1,21 @@
++--- a/crypto/modes/gcm128.c	2015-01-22 22:58:32.000000000 +0800
+++++ b/crypto/modes/gcm128.c	2015-02-18 00:51:55.574792326 +0800
++@@ -865,7 +865,8 @@ void CRYPTO_gcm128_init(GCM128_CONTEXT *
++         ctx->ghash = gcm_ghash_4bit;
++     }
++ # elif  defined(GHASH_ASM_PPC)
++-    if (OPENSSL_ppccap_P & PPC_CRYPTO207) {
+++    gcm_init_4bit(ctx->Htable, ctx->H.u);
+++/*    if (OPENSSL_ppccap_P & PPC_CRYPTO207) {
++         gcm_init_p8(ctx->Htable, ctx->H.u);
++         ctx->gmult = gcm_gmult_p8;
++         ctx->ghash = gcm_ghash_p8;
++@@ -873,7 +874,7 @@ void CRYPTO_gcm128_init(GCM128_CONTEXT *
++         gcm_init_4bit(ctx->Htable, ctx->H.u);
++         ctx->gmult = gcm_gmult_4bit;
++         ctx->ghash = gcm_ghash_4bit;
++-    }
+++    } */
++ # else
++     gcm_init_4bit(ctx->Htable, ctx->H.u);
++ # endif
