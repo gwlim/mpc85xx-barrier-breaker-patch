@@ -1,0 +1,14 @@
+--- /dev/null	2015-02-25 22:18:22.668938269 +0800
++++ ./target/linux/mpc85xx/patches-3.10/221-PPC-makefile-optimize.patch	2015-02-25 22:28:21.000000000 +0800
+@@ -0,0 +1,11 @@
++--- a/arch/powerpc/Makefile	2015-02-25 22:24:52.537786244 +0800
+++++ b/arch/powerpc/Makefile	2015-02-25 22:26:45.983962672 +0800
++@@ -141,7 +141,7 @@ endif
++ cpu-as-$(CONFIG_40x)		+= -Wa,-m405
++ cpu-as-$(CONFIG_44x)		+= -Wa,-m440
++ cpu-as-$(CONFIG_ALTIVEC)	+= -Wa,-maltivec
++-cpu-as-$(CONFIG_E500)		+= -Wa,-me500
+++cpu-as-$(CONFIG_E500)		+= -Wa,-me500 -mcpu=8548 -mspe -misel -mabi=spe -fomit-frame-pointer -mfloat-gprs=double
++ cpu-as-$(CONFIG_E200)		+= -Wa,-me200
++ 
++ KBUILD_AFLAGS += $(cpu-as-y)
