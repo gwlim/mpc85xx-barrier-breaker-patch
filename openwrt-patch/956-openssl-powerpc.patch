@@ -1,30 +1,6 @@
 --- ./package/libs/openssl/Makefile	2015-01-19 23:17:03.000000000 +0800
 +++ ./package/libs/openssl/Makefile	2015-01-19 23:17:41.535521063 +0800
-@@ -24,7 +24,7 @@ PKG_LICENSE:=SSLEAY OPENSSL
- PKG_LICENSE_FILES:=LICENSE
- PKG_BUILD_DEPENDS:=ocf-crypto-headers
- PKG_CONFIG_DEPENDS:=CONFIG_OPENSSL_ENGINE_CRYPTO CONFIG_OPENSSL_ENGINE_DIGEST \
--	CONFIG_OPENSSL_WITH_EC CONFIG_OPENSSL_WITH_EC2M
-+	CONFIG_OPENSSL_WITH_EC CONFIG_OPENSSL_WITH_EC2M CONFIG_OPENSSL_THREADS
- 
- include $(INCLUDE_DIR)/package.mk
- 
-@@ -80,7 +80,13 @@ endef
- 
- OPENSSL_NO_CIPHERS:= no-idea no-md2 no-mdc2 no-rc5 no-sha0 no-smime \
- 	no-aes192 no-camellia no-ans1 no-krb5
--OPENSSL_OPTIONS:= shared no-err no-hw zlib-dynamic no-sse2
-+OPENSSL_OPTIONS:= shared no-err no-hw zlib-dynamic no-sse2 no-ssl2 no-ssl3 no-rc5 no-mdc2 no-idea
-+
-+ifdef CONFIG_OPENSSL_THREADS
-+  OPENSSL_OPTIONS += threads
-+else
-+  OPENSSL_OPTIONS += no-threads
-+endif
- 
- ifdef CONFIG_OPENSSL_ENGINE_CRYPTO
-   OPENSSL_OPTIONS += -DHAVE_CRYPTODEV
-@@ -107,8 +113,12 @@ else
+@@ -113,8 +113,12 @@ else
    ifeq ($(CONFIG_mips)$(CONFIG_mipsel),y)
      OPENSSL_TARGET:=linux-mips-openwrt
    else
@@ -39,7 +15,7 @@
    endif
  endif
  
-@@ -144,7 +154,7 @@ TARGET_CFLAGS += $(FPIC)
+@@ -150,7 +154,7 @@ TARGET_CFLAGS += $(FPIC)
  define Build/Compile
  	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
  		CC="$(TARGET_CC)" \
@@ -48,7 +24,7 @@
  		AR="$(TARGET_CROSS)ar r" \
  		RANLIB="$(TARGET_CROSS)ranlib" \
  		OPENWRT_OPTIMIZATION_FLAGS="$(TARGET_CFLAGS)" \
-@@ -152,7 +162,7 @@ define Build/Compile
+@@ -158,7 +162,7 @@ define Build/Compile
  		all
  	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
  		CC="$(TARGET_CC)" \
@@ -57,3 +33,17 @@
  		AR="$(TARGET_CROSS)ar r" \
  		RANLIB="$(TARGET_CROSS)ranlib" \
  		OPENWRT_OPTIMIZATION_FLAGS="$(TARGET_CFLAGS)" \
+
+--- /dev/null	2015-01-19 20:50:17.318402839 +0800
++++ ./package/libs/openssl/patches/212-optimize-for-size-ppc.patch	2015-01-19 23:11:21.711522688 +0800
+@@ -0,0 +1,10 @@
++--- a/Configure	2015-01-18 20:46:02.000000000 +0800
+++++ b/Configure	2015-01-19 23:08:43.483291933 +0800
++@@ -405,6 +405,7 @@ my %table=(
++ 
++ # OpenWrt targets
++ "linux-mips-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${mips32_asm}:o32:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
+++"linux-ppc-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${ppc32_asm}:linux32:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
++ "linux-generic-openwrt","gcc:-DTERMIOS \$(OPENWRT_OPTIMIZATION_FLAGS) -fomit-frame-pointer -Wall::-D_REENTRANT::-ldl:BN_LLONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR:${no_asm}:dlfcn:linux-shared:-fPIC::.so.\$(SHLIB_MAJOR).\$(SHLIB_MINOR)",
++ 
++ # Android: linux-* but without -DTERMIO and pointers to headers and libs.
