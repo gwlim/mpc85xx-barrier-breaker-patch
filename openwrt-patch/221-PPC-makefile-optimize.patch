@@ -8,7 +8,7 @@
 + cpu-as-$(CONFIG_44x)		+= -Wa,-m440
 + cpu-as-$(CONFIG_ALTIVEC)	+= -Wa,-maltivec
 +-cpu-as-$(CONFIG_E500)		+= -Wa,-me500
-++cpu-as-$(CONFIG_E500)		+= -Wa,-me500 -Os -pipe -mcpu=8548 -misel -fomit-frame-pointer -fno-caller-saves -mfloat-gprs=double -maltivec
+++cpu-as-$(CONFIG_E500)		+= -Wa,-me500 -Os -pipe -mcpu=8548 -misel -fomit-frame-pointer -fno-caller-saves -mfloat-gprs=double
 + cpu-as-$(CONFIG_E200)		+= -Wa,-me200
 + 
 + KBUILD_AFLAGS += $(cpu-as-y)
