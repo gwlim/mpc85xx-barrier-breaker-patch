@@ -1,0 +1,104 @@
+--- /dev/null	2015-06-28 16:37:47.315080801 +0800
++++ ./target/linux/mpc85xx/patches-3.10/223-add-tl-wdr4900v1-int-controller.patch	2015-06-28 23:51:31.369017445 +0800
+@@ -0,0 +1,18 @@
++--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
+++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
++@@ -132,6 +132,15 @@
++ 			status = "disabled";
++ 		};
++ 
+++		mpic: pic@40000 {
+++			interrupt-controller;
+++			#address-cells = <0>;
+++			#interrupt-cells = <2>;
+++			reg = <0x40000 0x40000>;
+++			compatible = "chrp,open-pic";
+++			device_type = "open-pic";
+++		};
+++
++ 		serial1: serial@4600 {
++ 			status = "disabled";
++ 		};
+
+--- /dev/null	2015-06-28 16:37:47.315080801 +0800
++++ 224-add-more-devices.patch	2015-06-29 01:39:40.999487256 +0800
+@@ -0,0 +1,55 @@
++--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
+++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
++@@ -152,6 +152,52 @@
++ 		can1: can@1d000 {
++ 			status = "disabled";
++ 		};
+++
+++		L2: l2-cache-controller@20000 {
+++			compatible = "fsl,p1020-l2-cache-controller";
+++			reg = <0x20000 0x1000>;
+++			cache-line-size = <32>;	// 32 bytes
+++			cache-size = <0x40000>; // L2,256K
+++			interrupt-parent = <&mpic>;
+++			interrupts = <16 2>;
+++		};
+++
+++		dma@21300 {
+++			#address-cells = <1>;
+++			#size-cells = <1>;
+++			compatible = "fsl,eloplus-dma";
+++			reg = <0x21300 0x4>;
+++			ranges = <0x0 0x21100 0x200>;
+++			cell-index = <0>;
+++			dma-channel@0 {
+++				compatible = "fsl,eloplus-dma-channel";
+++				reg = <0x0 0x80>;
+++				cell-index = <0>;
+++				interrupt-parent = <&mpic>;
+++				interrupts = <20 2>;
+++			};
+++			dma-channel@80 {
+++				compatible = "fsl,eloplus-dma-channel";
+++				reg = <0x80 0x80>;
+++				cell-index = <1>;
+++				interrupt-parent = <&mpic>;
+++				interrupts = <21 2>;
+++			};
+++			dma-channel@100 {
+++				compatible = "fsl,eloplus-dma-channel";
+++				reg = <0x100 0x80>;
+++				cell-index = <2>;
+++				interrupt-parent = <&mpic>;
+++				interrupts = <22 2>;
+++			};
+++			dma-channel@180 {
+++				compatible = "fsl,eloplus-dma-channel";
+++				reg = <0x180 0x80>;
+++				cell-index = <3>;
+++				interrupt-parent = <&mpic>;
+++				interrupts = <23 2>;
+++			};
+++		};
++ 	};
++ 
++ 	pci0: pcie@ffe09000 {
+
+--- /dev/null	2015-06-28 16:37:47.315080801 +0800
++++ ./target/linux/mpc85xx/patches-3.10/225-set-l2-cache.patch	2015-06-29 00:54:10.656791321 +0800
+@@ -0,0 +1,20 @@
++--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
+++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
++@@ -26,6 +26,17 @@
++ 		spi0 = &spi0;
++ 	};
++ 
+++	cpus {
+++		#address-cells = <1>;
+++		#size-cells = <0>;
+++
+++		PowerPC,P1010@0 {
+++			device_type = "cpu";
+++			reg = <0x0>;
+++			next-level-cache = <&L2>;
+++		};
+++	};
+++
++ 	memory {
++ 		device_type = "memory";
++ 	};
