@@ -1,0 +1,36 @@
+--- /dev/null	2015-06-27 19:29:23.564559214 +0800
++++ ./target/linux/mpc85xx/patches-3.10/222-tl-wdr4900v1-add-rfkill-switch.patch	2015-06-28 11:42:10.184735446 +0800
+@@ -0,0 +1,15 @@
++--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
+++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
++@@ -206,6 +206,12 @@
++ 			gpios = <&gpio0 5 1>; /* active low */
++ 			linux,code = <0x198>; /* KEY_RESTART */
++ 		};
+++
+++		rfkill {
+++			label = "RFKILL switch";
+++			gpios = <&gpio0 11 1>; /* active low */
+++			linux,code = <0xf7>; /* RFKill */
+++		};
++ 	};
++ };
++ 
+--- /dev/null	2015-06-27 19:29:23.564559214 +0800
++++ ./target/linux/mpc85xx/patches-3.10/223-tl-wdr4900v1-add-usb-power.patch	2015-06-28 12:19:25.989786394 +0800
+@@ -0,0 +1,14 @@
++--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
+++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
++@@ -196,6 +196,11 @@
++ 			gpios = <&gpio0 4 1>; /* active low */
++ 			label = "tp-link:green:usb2";
++ 		};
+++
+++		usbpower {
+++			gpios = <&gpio0 10 1>; /* active low */
+++			label = "tp-link:usb:power";
+++		};
++ 	};
++ 
++ 	buttons {
+
