@@ -21,7 +21,7 @@
 + 		};
 
 --- /dev/null	2015-06-28 16:37:47.315080801 +0800
-+++ 224-add-more-devices.patch	2015-06-29 01:39:40.999487256 +0800
++++ ./target/linux/mpc85xx/patches-3.10/224-add-more-devices.patch	2015-06-29 01:39:40.999487256 +0800
 @@ -0,0 +1,55 @@
 +--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
 ++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
