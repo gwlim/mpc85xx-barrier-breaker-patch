@@ -1,12 +1,58 @@
---- /dev/null	2015-06-28 16:37:47.315080801 +0800
-+++ ./target/linux/mpc85xx/patches-3.10/223-add-tl-wdr4900v1-int-controller.patch	2015-06-28 23:51:31.369017445 +0800
-@@ -0,0 +1,18 @@
+--- /dev/null
++++ ./target/linux/mpc85xx/patches-3.10/222-add-devices-tl-wdr4900-dts.patch
+@@ -0,0 +1,141 @@
 +--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
 ++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-+@@ -132,6 +132,15 @@
-+ 			status = "disabled";
++@@ -26,6 +26,17 @@
++ 		spi0 = &spi0;
++ 	};
++ 
+++	cpus {
+++		#address-cells = <1>;
+++		#size-cells = <0>;
+++
+++		PowerPC,P1010@0 {
+++			device_type = "cpu";
+++			reg = <0x0>;
+++			next-level-cache = <&L2>;
+++		};
+++	};
+++
++ 	memory {
++ 		device_type = "memory";
++ 	};
++@@ -116,8 +127,26 @@
 + 		};
 + 
++ 		enet0: ethernet@b0000 {
+++			#address-cells = <1>;
+++			#size-cells = <1>;
+++			device_type = "network";
+++			model = "eTSEC";
+++			compatible = "fsl,etsec2";
+++			fsl,num_rx_queues = <0x8>;
+++			fsl,num_tx_queues = <0x8>;
+++			
+++			interrupt-parent = <&mpic>;
++ 			phy-handle = <&phy0>;
++ 			phy-connection-type = "rgmii-id";
+++
+++			
+++			
+++			
+++			
+++			
+++			
+++			
+++			
++ 		};
++ 
++ 		enet1: ethernet@b1000 {
++@@ -131,6 +160,15 @@
++ 		sdhc@2e000 {
++ 			status = "disabled";
++ 		};
+++ 
 ++		mpic: pic@40000 {
 ++			interrupt-controller;
 ++			#address-cells = <0>;
@@ -15,17 +61,10 @@
 ++			compatible = "chrp,open-pic";
 ++			device_type = "open-pic";
 ++		};
-++
++ 
 + 		serial1: serial@4600 {
 + 			status = "disabled";
-+ 		};
-
---- /dev/null	2015-06-28 16:37:47.315080801 +0800
-+++ ./target/linux/mpc85xx/patches-3.10/224-add-more-devices.patch	2015-06-29 01:39:40.999487256 +0800
-@@ -0,0 +1,55 @@
-+--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-+@@ -152,6 +152,52 @@
++@@ -143,6 +181,52 @@
 + 		can1: can@1d000 {
 + 			status = "disabled";
 + 		};
@@ -78,47 +117,28 @@
 + 	};
 + 
 + 	pci0: pcie@ffe09000 {
-
---- /dev/null	2015-06-28 16:37:47.315080801 +0800
-+++ ./target/linux/mpc85xx/patches-3.10/225-set-l2-cache.patch	2015-06-29 00:54:10.656791321 +0800
-@@ -0,0 +1,20 @@
-+--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-+@@ -26,6 +26,17 @@
-+ 		spi0 = &spi0;
-+ 	};
-+ 
-++	cpus {
-++		#address-cells = <1>;
-++		#size-cells = <0>;
++@@ -196,6 +280,11 @@
++ 			gpios = <&gpio0 4 1>; /* active low */
++ 			label = "tp-link:green:usb2";
++ 		};
 ++
-++		PowerPC,P1010@0 {
-++			device_type = "cpu";
-++			reg = <0x0>;
-++			next-level-cache = <&L2>;
+++		usbpower {
+++			gpios = <&gpio0 10 1>; /* active low */
+++			label = "tp-link:usb:power";
 ++		};
-++	};
-++
-+ 	memory {
-+ 		device_type = "memory";
 + 	};
---- /dev/null	2015-06-28 16:37:47.315080801 +0800
-+++ ./target/linux/mpc85xx/patches-3.10/226-add-ethernet-ring.patch	2015-06-29 20:35:55.482751118 +0800
-@@ -0,0 +1,17 @@
-+--- a/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-++++ b/arch/powerpc/boot/dts/tl-wdr4900-v1.dts
-+@@ -127,6 +127,14 @@
-+ 		};
 + 
-+ 		enet0: ethernet@b0000 {
-++			#address-cells = <1>;
-++			#size-cells = <1>;
-++			device_type = "network";
-++			model = "eTSEC";
-++			compatible = "fsl,etsec2";
-++			fsl,num_rx_queues = <0x8>;
-++			fsl,num_tx_queues = <0x8>;
-++			interrupt-parent = <&mpic>;
-+ 			phy-handle = <&phy0>;
-+ 			phy-connection-type = "rgmii-id";
++ 	buttons {
++@@ -206,6 +295,12 @@
++ 			gpios = <&gpio0 5 1>; /* active low */
++ 			linux,code = <0x198>; /* KEY_RESTART */
 + 		};
+++
+++		rfkill {
+++			label = "RFKILL switch";
+++			gpios = <&gpio0 11 1>; /* active low */
+++			linux,code = <0xf7>; /* RFKill */
+++		};
++ 	};
++ };
++ 
