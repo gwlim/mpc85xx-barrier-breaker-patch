@@ -70,7 +70,7 @@
 + 		};
 ++
 ++		L2: l2-cache-controller@20000 {
-++			compatible = "fsl,p1020-l2-cache-controller";
+++			compatible = "fsl,p1014-l2-cache-controller";
 ++			reg = <0x20000 0x1000>;
 ++			cache-line-size = <32>;	// 32 bytes
 ++			cache-size = <0x40000>; // L2,256K
