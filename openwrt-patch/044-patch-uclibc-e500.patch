@@ -1,9 +1,0 @@
---- ./toolchain/uClibc/config-0.9.33.2/powerpc.e500	2015-07-18 16:58:01.000000000 +0800
-+++ ./toolchain/uClibc/config-0.9.33.2/powerpc.e500	2015-07-18 18:02:48.038914527 +0800
-@@ -2,5 +2,5 @@ ARCH_BIG_ENDIAN=y
- # CONFIG_CLASSIC is not set
- CONFIG_E500=y
- TARGET_ARCH="powerpc"
--TARGET_SUBARCH="classic"
-+TARGET_SUBARCH="e500"
- TARGET_powerpc=y
