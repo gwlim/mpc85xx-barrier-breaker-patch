@@ -33,7 +33,7 @@
 ++			fsl,num_rx_queues = <0x8>;
 ++			fsl,num_tx_queues = <0x8>;
 ++			
-++			interrupt-parent = <&mpic>;
+++			
 + 			phy-handle = <&phy0>;
 + 			phy-connection-type = "rgmii-id";
 ++
@@ -74,7 +74,7 @@
 ++			reg = <0x20000 0x1000>;
 ++			cache-line-size = <32>;	// 32 bytes
 ++			cache-size = <0x40000>; // L2,256K
-++			interrupt-parent = <&mpic>;
+++			
 ++			interrupts = <16 2>;
 ++		};
 ++
@@ -89,28 +89,28 @@
 ++				compatible = "fsl,eloplus-dma-channel";
 ++				reg = <0x0 0x80>;
 ++				cell-index = <0>;
-++				interrupt-parent = <&mpic>;
+++				
 ++				interrupts = <20 2>;
 ++			};
 ++			dma-channel@80 {
 ++				compatible = "fsl,eloplus-dma-channel";
 ++				reg = <0x80 0x80>;
 ++				cell-index = <1>;
-++				interrupt-parent = <&mpic>;
+++				
 ++				interrupts = <21 2>;
 ++			};
 ++			dma-channel@100 {
 ++				compatible = "fsl,eloplus-dma-channel";
 ++				reg = <0x100 0x80>;
 ++				cell-index = <2>;
-++				interrupt-parent = <&mpic>;
+++				
 ++				interrupts = <22 2>;
 ++			};
 ++			dma-channel@180 {
 ++				compatible = "fsl,eloplus-dma-channel";
 ++				reg = <0x180 0x80>;
 ++				cell-index = <3>;
-++				interrupt-parent = <&mpic>;
+++				
 ++				interrupts = <23 2>;
 ++			};
 ++		};
